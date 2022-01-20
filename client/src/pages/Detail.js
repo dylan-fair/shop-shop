@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@apollo/client';
 import { useStoreContext } from '../utils/GlobalState';
+import { idbPromise } from '../utils/helpers';
 import { 
   REMOVE_FROM_CART,
   UPDATE_CART_QUANTITY,
@@ -25,37 +26,56 @@ function Detail() {
   useEffect(() => {
     if (products.length) {
       setCurrentProduct(products.find(product => product._id === id));
-    } else if (data) {
+    } 
+    else if (data) {
       dispatch({
         type: UPDATE_PRODUCTS,
         products: data.products
       });
+  
+      data.products.forEach((product) => {
+        idbPromise('products', 'put', product);
+      });
     }
-  }, [products, data, dispatch, id]);
+    else if (!loading) {
+      idbPromise('products', 'get').then((indexedProducts) => {
+        dispatch({
+          type: UPDATE_PRODUCTS,
+          products: indexedProducts
+        });
+      });
+    }
+  }, [products, data, loading, dispatch, id]);
 
   const addToCart = () => {
-    const itemInCart = cart.find(cartItem => cartItem._id === id);
-
-    if(itemInCart) {
+    const itemInCart = cart.find((cartItem) => cartItem._id === id)
+  
+    if (itemInCart) {
       dispatch({
         type: UPDATE_CART_QUANTITY,
         _id: id,
         purchaseQuantity: parseInt(itemInCart.purchaseQuantity) + 1
       });
+      idbPromise('cart', 'put', {
+        ...itemInCart,
+        purchaseQuantity: parseInt(itemInCart.purchaseQuantity) + 1
+      });
     } else {
       dispatch({
         type: ADD_TO_CART,
-        product: { ...currentProduct, purchaseQuantity: 1}
-      })
+        product: { ...currentProduct, purchaseQuantity: 1 }
+      });
+      idbPromise('cart', 'put', { ...currentProduct, purchaseQuantity: 1 });
     }
-  };
+  }
 
   const removeFromCart = () => {
     dispatch({
       type: REMOVE_FROM_CART,
       _id: currentProduct._id
-    })
-  }
+    });
+    idbPromise('cart', 'delete', { ...currentProduct });
+  };
 
   return (
     <>
